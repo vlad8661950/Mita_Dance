@@ -12,4 +12,8 @@ SDL2_VS - dynamic libraries for Visual Studio.
 
 PNG to Header Conversion:
 
+<<<<<<< HEAD
 `xxd -i miside00.png > miside00.h`
+=======
+`xxd -i miside00.png > miside00.h`
+>>>>>>> 5d0c69af54a7bd2594974ff060f66bb115a8536a
