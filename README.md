@@ -14,3 +14,4 @@ PNG to Header Conversion:
 
 `xxd -i miside00.png > miside00.h`
 
+Config file at %appdata%/Mita_Dance.ini
