@@ -3,6 +3,12 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+#My ignores
+1.txt
+Mita.exe
+Mita.o
+Mita.zip
+
 # User-specific files
 *.rsuser
 *.suo
