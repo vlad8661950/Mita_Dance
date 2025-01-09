@@ -25,7 +25,7 @@ struct ImageData {
 };
 
 struct Settings {
-    bool dragEnabled;
+    bool DragEnabled;
     SDL_bool AlwaysOnTop;
     int Width;
     int Height;
@@ -33,15 +33,17 @@ struct Settings {
     int PosY;
     int SavedPosX;
     int SavedPosY;
-    bool Twice_size;
+    int FrameDelay; 
+    bool DoubleSize;
+    bool MouseOff;
     bool Debug;
 
     static Settings defaultSettings() {
-        return { true, SDL_TRUE, Standart_Width, Standart_Height, 0, 0, 0, 0, false, false};
+        return { true, SDL_TRUE, Standart_Width, Standart_Height, 0, 0, 0, 0, 40, false, false, false};
     }
 };
 
-HWND getHWND(SDL_Window* window) {
+HWND GetHWND(SDL_Window* window) {
     SDL_SysWMinfo wmInfo;
     SDL_VERSION(&wmInfo.version);
     SDL_GetWindowWMInfo(window, &wmInfo);
@@ -59,9 +61,9 @@ string GetSettingsFile() {
     return filePath;
 }
 
-void saveSettingsToINI(const string& filePath, const Settings &settings, SDL_Window* window) {
+void SaveSettingsToINI(const string& filePath, const Settings &settings, SDL_Window* window) {
     ofstream file(filePath);
-    HWND hwnd = getHWND(window);
+    HWND hwnd = GetHWND(window);
     RECT rect;
     GetWindowRect(hwnd, &rect);
     if (!file.is_open()) {
@@ -70,23 +72,25 @@ void saveSettingsToINI(const string& filePath, const Settings &settings, SDL_Win
     }
 
     file << "[Window]\n";
-    file << "Width=" << (!settings.Twice_size ? settings.Width : settings.Width / 2) << "\n";
-    file << "Height=" << (!settings.Twice_size ? settings.Height : settings.Height / 2) << "\n";
-    file << "AlwaysOnTop=" << (settings.AlwaysOnTop  == SDL_TRUE? "true" : "false") << "\n";
-    file << "PosX=" << rect.left << "\n"; //settings.PosX
-    file << "PosY=" << rect.top << "\n"; //settings.PosY
+    file << "Width=" << (!settings.DoubleSize ? settings.Width : settings.Width / 2) << "\n";
+    file << "Height=" << (!settings.DoubleSize ? settings.Height : settings.Height / 2) << "\n";
+    file << "PosX=" << rect.left << "\n"; 
+    file << "PosY=" << rect.top << "\n"; 
     file << "SavedPosX=" << settings.SavedPosX << "\n";
     file << "SavedPosY=" << settings.SavedPosY << "\n";
+    file << "FrameDelay=" << settings.FrameDelay << "\n"; // Коэфициент Задержки между кадрами (мс)
+    file << "AlwaysOnTop=" << (settings.AlwaysOnTop == SDL_TRUE ? "true" : "false") << "\n";
 
     file << "\n[Features]\n";
-    file << "dragEnabled=" << (settings.dragEnabled ? "true" : "false") << "\n";
-    file << "Twice_size=" << (settings.Twice_size ? "true" : "false") << "\n";
+    file << "DragEnabled=" << (settings.DragEnabled ? "true" : "false") << "\n";
+    file << "DoubleSize=" << (settings.DoubleSize ? "true" : "false") << "\n";
+    file << "MouseOff=" << (settings.MouseOff ? "true" : "false") << "\n";
     file << "Debug=" << (settings.Debug ? "true" : "false") << "\n";
 
     file.close();
 }
 
-void loadSettingsFromINI(const string &filePath, Settings &settings) {
+void LoadSettingsFromINI(const string &filePath, Settings &settings) {
     ifstream file(filePath);
     settings = Settings::defaultSettings();
     if (!file.is_open()) {
@@ -94,41 +98,40 @@ void loadSettingsFromINI(const string &filePath, Settings &settings) {
         return;
     }
     
-    string line, section;
+    string line;
     map<string, string> keyValues;
 
     while (getline(file, line)) {
         line.erase(0, line.find_first_not_of(" \t")); // Удаление пробелов в начале строки
         if (line.empty()) continue; // Пропускаем пустые строки
 
-        if (line[0] == '[') section = line.substr(1, line.find(']') - 1);
-        else {
-            auto delimiterPos = line.find('=');
-            if (delimiterPos == string::npos) continue;
-            string key = line.substr(0, delimiterPos);
-            string value = line.substr(delimiterPos + 1);
+        auto delimiterPos = line.find('=');
+        if (delimiterPos == string::npos) continue;
+        string key = line.substr(0, delimiterPos);
+        string value = line.substr(delimiterPos + 1);
 
-            // Удаление пробелов вокруг ключа и значения
-            key.erase(0, key.find_first_not_of(" \t"));
-            key.erase(key.find_last_not_of(" \t") + 1);
-            value.erase(0, value.find_first_not_of(" \t"));
-            value.erase(value.find_last_not_of(" \t") + 1);
+        // Удаление пробелов вокруг ключа и значения
+        key.erase(0, key.find_first_not_of(" \t"));
+        key.erase(key.find_last_not_of(" \t") + 1);
+        value.erase(0, value.find_first_not_of(" \t"));
+        value.erase(value.find_last_not_of(" \t") + 1);
 
-            keyValues[section + "." + key] = value;
-        }
+        keyValues[key] = value;
     }
     file.close();
 
-    if (keyValues.count("Window.Width")) settings.Width = stoi(keyValues["Window.Width"]);
-    if (keyValues.count("Window.Height")) settings.Height = stoi(keyValues["Window.Height"]);
-    if (keyValues.count("Window.AlwaysOnTop")) settings.AlwaysOnTop = keyValues["Window.AlwaysOnTop"] == "true" ? SDL_TRUE : SDL_FALSE;
-    if (keyValues.count("Window.PosX")) settings.PosX = stoi(keyValues["Window.PosX"]);
-    if (keyValues.count("Window.PosY")) settings.PosY = stoi(keyValues["Window.PosY"]);
-    if (keyValues.count("Window.SavedPosX")) settings.SavedPosX = stoi(keyValues["Window.SavedPosX"]);
-    if (keyValues.count("Window.SavedPosY")) settings.SavedPosY = stoi(keyValues["Window.SavedPosY"]);
-    if (keyValues.count("Features.dragEnabled")) settings.dragEnabled = keyValues["Features.dragEnabled"] == "true";
-    if (keyValues.count("Features.Twice_size")) settings.Twice_size = keyValues["Features.Twice_size"] == "true";
-    if (keyValues.count("Features.Debug")) settings.Debug = keyValues["Features.Debug"] == "true";
+    if (keyValues.count("Width")) settings.Width = stoi(keyValues["Width"]);
+    if (keyValues.count("Height")) settings.Height = stoi(keyValues["Height"]);
+    if (keyValues.count("PosX")) settings.PosX = stoi(keyValues["PosX"]);
+    if (keyValues.count("PosY")) settings.PosY = stoi(keyValues["PosY"]);
+    if (keyValues.count("SavedPosX")) settings.SavedPosX = stoi(keyValues["SavedPosX"]);
+    if (keyValues.count("SavedPosY")) settings.SavedPosY = stoi(keyValues["SavedPosY"]);
+    if (keyValues.count("FrameDelay")) settings.FrameDelay = stoi(keyValues["FrameDelay"]);
+    if (keyValues.count("AlwaysOnTop")) settings.AlwaysOnTop = keyValues["AlwaysOnTop"] == "true" ? SDL_TRUE : SDL_FALSE;
+    if (keyValues.count("DragEnabled")) settings.DragEnabled = keyValues["DragEnabled"] == "true";
+    if (keyValues.count("DoubleSize")) settings.DoubleSize = keyValues["DoubleSize"] == "true";
+    if (keyValues.count("MouseOff")) settings.MouseOff = keyValues["MouseOff"] == "true";
+    if (keyValues.count("Debug")) settings.Debug = keyValues["Debug"] == "true";
 }
 
 
@@ -151,22 +154,22 @@ vector<SDL_Texture*> loadFrames(SDL_Renderer* renderer, const vector<string>& fi
             SDL_RWclose(rw);
 
         }
-        SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_BLEND); // alpha канал 
+        SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_BLEND); // alpha mode png
 
-        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);// Создание текстуры из изображения
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
         SDL_FreeSurface(surface);
         if (!texture) {
             SDL_Log("Texture creation Failed %s", SDL_GetError());
             continue;
         }
-        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);  // альфа-смешивание
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);  
         frames.push_back(texture);
     }
     return frames;
 }
 
-void makeWindowTransparent(SDL_Window * window) {
-    HWND hwnd = getHWND(window);
+void MakeWindowTransparent(SDL_Window * window) {
+    HWND hwnd = GetHWND(window);
     LONG style = GetWindowLong(hwnd, GWL_EXSTYLE);
     style |= WS_EX_LAYERED;
     SetWindowLong(hwnd, GWL_EXSTYLE, style);
@@ -174,14 +177,15 @@ void makeWindowTransparent(SDL_Window * window) {
 }
 
 // Контекстное меню
-int showContextMenu(HWND hwnd, int x, int y, bool drag, bool top, bool twice_size) {
+int ShowContextMenu(HWND hwnd, int x, int y, const Settings settings) {
     HMENU hMenu = CreatePopupMenu();
     AppendMenuW(hMenu, MF_STRING, 1, L"Exit");
-    AppendMenuW(hMenu, MF_STRING | (drag ? MF_CHECKED : MF_UNCHECKED), 2, L"Enable Drag");
-    AppendMenuW(hMenu, MF_STRING | (top ? MF_CHECKED : MF_UNCHECKED), 3, L"Always on Top");
+    AppendMenuW(hMenu, MF_STRING | (settings.DragEnabled ? MF_CHECKED : MF_UNCHECKED), 2, L"Enable Drag");
+    AppendMenuW(hMenu, MF_STRING | (settings.AlwaysOnTop ? MF_CHECKED : MF_UNCHECKED), 3, L"Always on Top");
     AppendMenuW(hMenu, MF_STRING, 4, L"Save Pos");
     AppendMenuW(hMenu, MF_STRING, 5, L"Restore Pos");
-    AppendMenuW(hMenu, MF_STRING | (twice_size ? MF_CHECKED : MF_UNCHECKED), 6, L"???");
+    AppendMenuW(hMenu, MF_STRING | (settings.MouseOff ? MF_CHECKED : MF_UNCHECKED), 7, L"MouseOff");
+    AppendMenuW(hMenu, MF_STRING | (settings.DoubleSize ? MF_CHECKED : MF_UNCHECKED), 6, L"???");
     AppendMenuW(hMenu, MF_SEPARATOR, 0, L"");
     AppendMenuW(hMenu, MF_STRING, 0, L"Created by DelaitMax");
 
@@ -190,6 +194,24 @@ int showContextMenu(HWND hwnd, int x, int y, bool drag, bool top, bool twice_siz
     return cmd;
 }
 
+void AntiClickMode(HWND hwnd, bool mouse) {
+    LONG exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+    if (mouse) exStyle |= WS_EX_TRANSPARENT;
+    else exStyle &= ~WS_EX_TRANSPARENT;
+    SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
+}
+
+void AlwaysOnTopMode(SDL_Window* window, SDL_bool& AlwaysOnTop) {
+    HWND hwnd = GetHWND(window);
+    if (AlwaysOnTop == SDL_TRUE) {
+        SDL_SetWindowAlwaysOnTop(window, AlwaysOnTop);
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    }
+    else {
+        SDL_SetWindowAlwaysOnTop(window, AlwaysOnTop);
+        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+}//плохо работаетб переделать.
 
 
 int main(int argc, char* argv[]) {
@@ -199,7 +221,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
     Settings settings;
-    loadSettingsFromINI(settingsFile, settings);
+    LoadSettingsFromINI(settingsFile, settings);
     int& Width = settings.Width;
     int& Height = settings.Height;
     SDL_bool& AlwaysOnTop = settings.AlwaysOnTop;
@@ -207,17 +229,19 @@ int main(int argc, char* argv[]) {
     int& PosY = settings.PosY;
     int& SavedPosX = settings.SavedPosX;
     int& SavedPosY = settings.SavedPosY;
-    bool& dragEnabled = settings.dragEnabled;
-    bool& Twice_size = settings.Twice_size;
+    int& FrameDelay = settings.FrameDelay;
+    bool& DragEnabled = settings.DragEnabled;
+    bool& DoubleSize = settings.DoubleSize;
+    bool& MouseOff = settings.MouseOff;
     if (settings.Debug) AllocConsole();
-    if (Twice_size) {
+    if (DoubleSize) {
         Width *= 2;
         Height *= 2;
     }
 
     vector<string> framePaths = {
     "miside00.png", "miside02.png", "miside05.png", "miside07.png", "miside08.png"
-    }; //For VS
+    }; //For debug
     vector<ImageData> imageData = {
         { miside00_png, miside00_png_len },
         { miside02_png, miside02_png_len },
@@ -227,7 +251,7 @@ int main(int argc, char* argv[]) {
     }; //Headers png
 
     bool running = true, dragging = false;
-    Uint32 lastFrameTime = SDL_GetTicks(), frameDelay = 35;// Коэфициент Задержки между кадрами (мс)
+    Uint32 lastFrameTime = SDL_GetTicks();
     int FrameToFrameDelay[] = { 2,3,2,1,3 };
     int dragOffsetX = 0, dragOffsetY = 0;
     size_t frameIndex = 0;
@@ -248,9 +272,10 @@ int main(int argc, char* argv[]) {
         "Mita", PosX, PosY, Width, Height,
         SDL_WINDOW_SHOWN | SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_BORDERLESS | SDL_WINDOW_SKIP_TASKBAR
     );
-    makeWindowTransparent(window); // Устанавливаем прозрачность окна
+    MakeWindowTransparent(window);
+    AlwaysOnTopMode(window, AlwaysOnTop);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE);
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND); // Включаем альфа-смешивание для рендерера
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND); 
 
     vector<SDL_Texture*> frames = loadFrames(renderer, framePaths, imageData);// Загружаем кадры
     if (frames.size() != framePaths.size()) {
@@ -263,29 +288,34 @@ int main(int argc, char* argv[]) {
     while (running) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) running = false;
-            HWND hwnd = getHWND(window);
+            HWND hwnd = GetHWND(window);
             RECT rect;
             GetWindowRect(hwnd, &rect);
             if (event.type == SDL_MOUSEBUTTONDOWN) {
                 if (event.button.button == SDL_BUTTON_LEFT) {
-                    dragging = true;
-                    dragOffsetX = event.button.x;
-                    dragOffsetY = event.button.y;
+                    if (MouseOff) {
+                        AntiClickMode(hwnd, true);
+                    }
+                    else {
+                        dragging = true;
+                        dragOffsetX = event.button.x;
+                        dragOffsetY = event.button.y;
+                    }
                 }
                 else if (event.button.button == SDL_BUTTON_RIGHT) {
-                    int cmd = showContextMenu(hwnd,
-                        rect.left + event.button.x, rect.top + event.button.y, dragEnabled, AlwaysOnTop, Twice_size);
+                    int cmd = ShowContextMenu(hwnd,
+                        rect.left + event.button.x, rect.top + event.button.y, settings);
 
                     switch (cmd) {
                     case 1:
                         running = false;
                         break;
                     case 2:
-                        dragEnabled = !dragEnabled;
+                        DragEnabled = !DragEnabled;
                         break;
                     case 3:
                         AlwaysOnTop = AlwaysOnTop == SDL_TRUE ? SDL_FALSE : SDL_TRUE;
-                        SDL_SetWindowAlwaysOnTop(window, AlwaysOnTop);
+                        AlwaysOnTopMode(window, AlwaysOnTop);
                         break;
                     case 4:
                         SavedPosX = rect.left;
@@ -296,35 +326,45 @@ int main(int argc, char* argv[]) {
                         PosY = SavedPosY;
                         MoveWindow(hwnd, PosX, PosY, Width, Height, TRUE);
                         break;
+                    case 7:
+                        MouseOff = !MouseOff;
+                        break;
                     case 6:
-                        Twice_size = !Twice_size;
-                        Width = Twice_size ? Width*2 : Width / 2;
-                        Height = Twice_size ? Height*2 : Height / 2;
+                        DoubleSize = !DoubleSize;
+                        Width = DoubleSize ? Width*2 : Width / 2;
+                        Height = DoubleSize ? Height*2 : Height / 2;
                         SDL_SetWindowSize(window, Width, Height);
                         break;
                     }
-                    saveSettingsToINI(settingsFile, settings, window);
+                    SaveSettingsToINI(settingsFile, settings, window);
                 }
             }
             else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
                 dragging = false;
             }
-            else if (event.type == SDL_MOUSEMOTION && dragging && dragEnabled) {
+            else if (event.type == SDL_MOUSEMOTION && dragging && DragEnabled) {
                 MoveWindow(hwnd, rect.left + (event.motion.x - dragOffsetX), rect.top + (event.motion.y - dragOffsetY), Width, Height, TRUE);
             }
+            else if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && (event.key.keysym.sym == SDLK_LALT || event.key.keysym.sym == SDLK_RALT)) {
+                AntiClickMode(hwnd, false);
+            } // Off MouseOff mode. Alt+Tab to Mita, Re-press Alt, RMB on Mita.
+            //else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+
+            //    SetWindowPos(hwnd, HWND_TOPMOST, rect.left + (event.motion.x - dragOffsetX), rect.top + (event.motion.y - dragOffsetY), 0, 0, SWP_NOSIZE);
+            //    cout << rect.left << rect.top << "xa\n";
+            //    EnumWindows()
+            //}
         }
 
-        // Переключение кадров
-        if (SDL_GetTicks() - lastFrameTime > frameDelay * FrameToFrameDelay[frameIndex]) {
+        if (SDL_GetTicks() - lastFrameTime > FrameDelay * FrameToFrameDelay[frameIndex]) {
             frameIndex = (frameIndex + 1) % frames.size();
             lastFrameTime = SDL_GetTicks();
         }
 
-        // Рендеринг
+
         SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
         SDL_RenderSetLogicalSize(renderer, Width, Height);
         SDL_RenderClear(renderer);
-
         SDL_RenderCopy(renderer, frames[frameIndex], nullptr, nullptr);
         SDL_RenderPresent(renderer);
     }
