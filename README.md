@@ -1,7 +1,7 @@
 # Mita Dance
 ![Mita](png/miside00.png)
 
-Mita from Miside Dance programm.
+Mita from Miside.
 The program is based on Konata Dance but uses SDL2.
 
 
