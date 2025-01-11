@@ -1,7 +1,8 @@
 # Mita Dance
 ![Mita](png/miside00.png)
 
-The program is based on Konata Dance but uses SDL2. It has some rendering issues.
+Mita from Miside Dance programm.
+The program is based on Konata Dance but uses SDL2.
 
 
 Compilation command with static SDL2 libraries:
